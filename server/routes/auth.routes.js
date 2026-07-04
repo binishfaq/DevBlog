@@ -7,6 +7,8 @@ import {
   login,
   getCurrentUser,
   logout,
+  updateUser,
+  uploadAvatar,
 } from "../controllers/auth.controller.js";
 
 import {
@@ -39,5 +41,9 @@ router.get("/me", protect, getCurrentUser);
 
 // Logout
 router.post("/logout", logout);
+
+router.put("/update", protect, updateUser);
+router.post("/upload-avatar", protect, uploadAvatar);
+
 
 export default router;

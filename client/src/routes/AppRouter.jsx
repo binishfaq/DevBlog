@@ -13,8 +13,12 @@ import About from "../pages/About";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Dashboard from "../pages/Dashboard";
+import CreatePost from "../pages/CreatePost";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
+import MyPosts from "../pages/MyPosts";
+import EditPost from "../pages/EditPost";
+import Settings from "../pages/Settings";
 
 const router = createBrowserRouter([
   {
@@ -46,23 +50,58 @@ const router = createBrowserRouter([
         path: "register",
         element: <Register />,
       },
-     {
-  path: "dashboard",
-  element: (
-    <ProtectedRoute>
-      <Dashboard />
-    </ProtectedRoute>
-  ),
-},
       {
-  path: "profile",
+  path: "dashboard/settings",
   element: (
     <ProtectedRoute>
-      <Profile />
+      <Settings />
     </ProtectedRoute>
   ),
 },
+
+      // ============ PROTECTED ROUTES ============
+      {
+        path: "dashboard",
+        element: (
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "dashboard/posts",
+        element: (
+          <ProtectedRoute>
+            <MyPosts />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "dashboard/posts/new",
+        element: (
+          <ProtectedRoute>
+            <CreatePost />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "dashboard/posts/edit/:id",
+        element: (
+          <ProtectedRoute>
+            <EditPost />
+          </ProtectedRoute>
+        ),
+      },
+      
     ],
+  },
+  {
+    path: "/profile",
+    element: (
+      <ProtectedRoute>
+        <Profile />
+      </ProtectedRoute>
+    ),
   },
 ]);
 
