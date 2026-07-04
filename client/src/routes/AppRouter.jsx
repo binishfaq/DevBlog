@@ -4,6 +4,7 @@ import {
 } from "react-router-dom";
 
 import MainLayout from "../components/layout/MainLayout";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 import Home from "../pages/Home";
 import Blogs from "../pages/Blogs";
@@ -45,14 +46,22 @@ const router = createBrowserRouter([
         path: "register",
         element: <Register />,
       },
+     {
+  path: "dashboard",
+  element: (
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  ),
+},
       {
-        path: "dashboard",
-        element: <Dashboard />,
-      },
-      {
-        path: "profile",
-        element: <Profile />,
-      },
+  path: "profile",
+  element: (
+    <ProtectedRoute>
+      <Profile />
+    </ProtectedRoute>
+  ),
+},
     ],
   },
 ]);

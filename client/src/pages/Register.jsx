@@ -128,7 +128,7 @@ const Register = () => {
               <h2 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                 Create Account
               </h2>
-              <span className="text-xl">🚀</span>
+              
             </div>
             <p className="text-slate-500 text-xs mt-1">
               Join DevBlog and start learning today
@@ -150,7 +150,7 @@ const Register = () => {
       type="text"
       name="fullName"
       value={formData.fullName}
-      placeholder="Zain Bin Ishfaq"
+      placeholder="FullName"
       className="w-full py-2 px-2 outline-none bg-transparent text-xs placeholder:text-gray-400"
       onChange={handleChange}
       required
@@ -168,7 +168,7 @@ const Register = () => {
                   type="text"
                   name="username"
                   value={formData.username}
-                  placeholder="johndoe"
+                  placeholder="Username"
                   className="w-full py-2 px-2 outline-none bg-transparent text-xs placeholder:text-gray-400"
                   onChange={handleChange}
                   required
@@ -187,7 +187,7 @@ const Register = () => {
                   type="email"
                   name="email"
                   value={formData.email}
-                  placeholder="you@example.com"
+                  placeholder="Email Address"
                   className="w-full py-2 px-2 outline-none bg-transparent text-xs placeholder:text-gray-400"
                   onChange={handleChange}
                   required

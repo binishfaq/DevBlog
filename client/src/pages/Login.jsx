@@ -1,15 +1,44 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate} from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
 import { useState } from "react";
+import { loginUser } from "../services/auth.service";
+
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  
 
+  const navigate = useNavigate();
+
+const handleLogin = async (e) => {
+  e.preventDefault();
+
+  try {
+    const data = await loginUser({
+      email,
+      password,
+    });
+
+    // Save token
+    localStorage.setItem("token", data.token);
+
+    // Save user
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    navigate("/dashboard");
+
+  } catch (error) {
+    alert(error.response?.data?.message || "Login Failed");
+  }
+};
+  
+
+  
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       
@@ -83,7 +112,7 @@ const Login = () => {
           </div>
 
           {/* Form */}
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleLogin}>
             {/* Email */}
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1.5">
@@ -95,7 +124,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="mail@gmail.com"
+                  placeholder="Email Address"
                   className="w-full py-3 px-3 outline-none bg-transparent text-sm placeholder:text-gray-400"
                 />
               </div>
@@ -144,7 +173,7 @@ const Login = () => {
             </div>
 
             {/* Login Button */}
-            <button className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 text-white font-semibold py-3.5 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:-translate-y-0.5">
+            <button className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 text-white font-semibold py-3.5 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:-translate-y-0.5" type="submit">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
               <div className="relative flex items-center justify-center gap-2 text-sm">
                 Sign In
