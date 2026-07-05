@@ -1,57 +1,61 @@
-import { Link, useNavigate} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
 import { useState } from "react";
 import { loginUser } from "../services/auth.service";
 
-
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
-const handleLogin = async (e) => {
-  e.preventDefault();
+  // ===== EMAIL LOGIN =====
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const data = await loginUser({
-      email,
-      password,
-    });
+    try {
+      const data = await loginUser({
+        email,
+        password,
+      });
 
-    // Save token
-    localStorage.setItem("token", data.token);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
-    // Save user
-    localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/dashboard");
+    } catch (error) {
+      alert(error.response?.data?.message || "Login Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    navigate("/dashboard");
+  // ===== GOOGLE LOGIN =====
+  const handleGoogleLogin = () => {
+    window.location.href = "http://localhost:5000/api/auth/google";
+  };
 
-  } catch (error) {
-    alert(error.response?.data?.message || "Login Failed");
-  }
-};
-  
+  // ===== GITHUB LOGIN =====
+  const handleGithubLogin = () => {
+    window.location.href = "http://localhost:5000/api/auth/github";
+  };
 
-  
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       
       {/* Left Side - Brand */}
       <div className="w-5/12 flex items-center justify-center p-8 relative overflow-hidden">
-        {/* Background container with 350x350 */}
         <div className="w-[350px] h-[350px] bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white flex flex-col justify-center p-6 relative overflow-hidden rounded-tl-2xl rounded-br-2xl shadow-2xl">
-          {/* Decorative */}
           <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/5 rounded-full blur-2xl"></div>
           <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/5 rounded-full blur-2xl"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-400/5 rounded-full blur-3xl"></div>
           
-          {/* Decorative dots pattern */}
           <div className="absolute top-4 right-4 flex gap-1">
             <span className="w-1 h-1 bg-white/20 rounded-full"></span>
             <span className="w-1 h-1 bg-white/20 rounded-full"></span>
@@ -64,19 +68,16 @@ const handleLogin = async (e) => {
           </div>
           
           <div className="relative z-10 flex flex-col justify-center items-start text-left w-full h-full">
-            {/* Welcome Badge */}
             <div className="mb-3 inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 border border-white/10">
               <span className="text-[10px] font-medium text-blue-100">Welcome back!</span>
             </div>
 
-            {/* Logo */}
             <div className="mb-2">
               <span className="text-2xl font-black bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent tracking-tight">
                 DevBlog
               </span>
             </div>
 
-            {/* Tagline */}
             <h2 className="text-2xl font-bold leading-snug">
               Your Journey
               <br />
@@ -87,7 +88,6 @@ const handleLogin = async (e) => {
               Learn, grow, and connect with a community of passionate developers.
             </p>
             
-            {/* Decorative line */}
             <div className="mt-3 w-12 h-0.5 bg-gradient-to-r from-blue-300 to-transparent rounded-full"></div>
           </div>
         </div>
@@ -95,7 +95,6 @@ const handleLogin = async (e) => {
 
       {/* Right Side - Login Form */}
       <div className="w-7/12 flex flex-col justify-center p-8 relative overflow-hidden">
-        {/* Background Decorations */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-200/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-200/10 rounded-full blur-3xl"></div>
         <div className="absolute top-1/2 right-1/4 w-32 h-32 bg-blue-300/5 rounded-full blur-2xl"></div>
@@ -173,10 +172,14 @@ const handleLogin = async (e) => {
             </div>
 
             {/* Login Button */}
-            <button className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 text-white font-semibold py-3.5 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:-translate-y-0.5" type="submit">
+            <button 
+              className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 text-white font-semibold py-3.5 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25 hover:-translate-y-0.5 disabled:opacity-70" 
+              type="submit"
+              disabled={loading}
+            >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
               <div className="relative flex items-center justify-center gap-2 text-sm">
-                Sign In
+                {loading ? "Signing in..." : "Sign In"}
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
@@ -193,14 +196,22 @@ const handleLogin = async (e) => {
 
           {/* Social Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <button className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300">
+            {/* Google Button */}
+            <button
+              onClick={handleGoogleLogin}
+              className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"
+            >
               <FcGoogle size={20} />
               <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
                 Google
               </span>
             </button>
 
-            <button className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300">
+            {/* GitHub Button */}
+            <button
+              onClick={handleGithubLogin}
+              className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"
+            >
               <FaGithub size={20} className="text-slate-800" />
               <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
                 GitHub

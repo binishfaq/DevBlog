@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Calendar, User, Clock, Heart, Eye, Share2, MessageCircle, ArrowLeft } from "lucide-react";
+import { 
+  Calendar, User, Clock, Heart, Eye, Share2, MessageCircle, 
+  ArrowLeft, ThumbsUp, Send, Loader2, Trash2 
+} from "lucide-react";
 import Container from "../components/layout/Container";
 import api from "../api/axios";
 
@@ -9,14 +12,143 @@ const BlogDetails = () => {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingComment, setDeletingComment] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    // Get current user
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
     fetchPost();
   }, [id]);
 
-  // ===== HELPER FUNCTIONS =====
+  const fetchPost = async () => {
+    try {
+      setLoading(true);
+      
+      // Try by slug first
+      try {
+        const response = await api.get(`/posts/slug/${id}`);
+        setPost(response.data.post);
+        setComments(response.data.post.comments || []);
+        setLikeCount(response.data.post.likes || 0);
+        setLoading(false);
+        return;
+      } catch (slugError) {
+        console.log("Not found by slug, trying by ID...");
+      }
+
+      // Try by ID
+      try {
+        const response = await api.get(`/posts/${id}`);
+        setPost(response.data.post);
+        setComments(response.data.post.comments || []);
+        setLikeCount(response.data.post.likes || 0);
+      } catch (idError) {
+        console.error("Post not found:", idError);
+        setPost(null);
+      }
+    } catch (error) {
+      console.error("Error fetching post:", error);
+      setPost(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+ // ===== LIKE HANDLER =====
+const handleLike = async () => {
+  if (!post) return;
+  
+  if (!user) {
+    alert("Please login to like posts");
+    return;
+  }
+
+  try {
+    // ✅ Updated endpoint
+    const response = await api.post(`/likes/${post._id}/toggle`);
+    setLiked(response.data.liked);
+    setLikeCount(response.data.likes);
+  } catch (error) {
+    console.error("Error liking post:", error);
+    if (error.response?.status === 401) {
+      alert("Please login to like posts");
+    }
+  }
+};
+
+// ===== COMMENT HANDLER =====
+const handleComment = async (e) => {
+  e.preventDefault();
+  if (!comment.trim() || !post) return;
+
+  if (!user) {
+    alert("Please login to comment");
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+    // ✅ Updated endpoint
+    const response = await api.post(`/comments/${post._id}`, { text: comment });
+    setComments(response.data.comments);
+    setComment("");
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    if (error.response?.status === 401) {
+      alert("Please login to comment");
+    } else {
+      alert("Failed to add comment");
+    }
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+// ===== DELETE COMMENT =====
+const handleDeleteComment = async (commentId) => {
+  if (!window.confirm("Delete this comment?")) return;
+  
+  try {
+    setDeletingComment(commentId);
+    // ✅ Updated endpoint
+    await api.delete(`/comments/${commentId}`);
+    setComments(comments.filter(c => c._id !== commentId));
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    alert("Failed to delete comment");
+  } finally {
+    setDeletingComment(null);
+  }
+};
+
+  // ===== SHARE HANDLER =====
+  const handleShare = () => {
+    if (!post) return;
+    if (navigator.share) {
+      navigator.share({
+        title: post.title,
+        text: post.title,
+        url: window.location.href,
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert("Link copied to clipboard!");
+    }
+  };
+
+  // Helper functions
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -38,104 +170,6 @@ const BlogDetails = () => {
     return name.charAt(0).toUpperCase();
   };
 
-  // ===== CHECK IF ID IS A VALID MONGODB OBJECTID =====
-  const isValidObjectId = (str) => {
-    return /^[0-9a-fA-F]{24}$/.test(str);
-  };
-
-  // ===== FETCH POST =====
-  const fetchPost = async () => {
-    try {
-      setLoading(true);
-      console.log("🔍 Fetching post with slug/ID:", id);
-      
-      // Check if this looks like a slug or an ID
-      const looksLikeId = isValidObjectId(id);
-      
-      if (looksLikeId) {
-        // Try by ID first (for authenticated users)
-        try {
-          console.log("📌 Trying by ID...");
-          const response = await api.get(`/posts/${id}`);
-          console.log("✅ Post found by ID:", response.data);
-          setPost(response.data.post);
-          setComments(response.data.post.comments || []);
-          setLoading(false);
-          return;
-        } catch (idError) {
-          console.log("❌ Not found by ID, trying slug...");
-        }
-      }
-      
-      // Try by slug (for public viewing)
-      try {
-        console.log("📌 Trying by slug...");
-        const response = await api.get(`/posts/slug/${id}`);
-        console.log("✅ Post found by slug:", response.data);
-        setPost(response.data.post);
-        setComments(response.data.post.comments || []);
-      } catch (slugError) {
-        console.error("❌ Not found by slug:", slugError.response?.status);
-        setPost(null);
-      }
-    } catch (error) {
-      console.error("❌ Error fetching post:", error);
-      setPost(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ===== LIKE HANDLER =====
-  const handleLike = async () => {
-    if (!post) return;
-    try {
-      const response = await api.post(`/posts/${post._id}/like`);
-      setPost({ ...post, likes: response.data.likes });
-      setLiked(true);
-    } catch (error) {
-      console.error("Error liking post:", error);
-      if (error.response?.status === 401) {
-        alert("Please login to like posts");
-      }
-    }
-  };
-
-  // ===== COMMENT HANDLER =====
-  const handleComment = async (e) => {
-    e.preventDefault();
-    if (!comment.trim() || !post) return;
-
-    try {
-      const response = await api.post(`/posts/${post._id}/comments`, { text: comment });
-      setComments(response.data.comments);
-      setComment("");
-    } catch (error) {
-      console.error("Error adding comment:", error);
-      if (error.response?.status === 401) {
-        alert("Please login to comment");
-      } else {
-        alert("Failed to add comment");
-      }
-    }
-  };
-
-  // ===== SHARE HANDLER =====
-  const handleShare = () => {
-    if (!post) return;
-    if (navigator.share) {
-      navigator.share({
-        title: post.title,
-        text: post.title,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert("Link copied to clipboard!");
-    }
-  };
-
-  // ===== LOADING STATE =====
   if (loading) {
     return (
       <section className="min-h-screen bg-slate-50 py-12">
@@ -157,7 +191,6 @@ const BlogDetails = () => {
     );
   }
 
-  // ===== NOT FOUND STATE =====
   if (!post) {
     return (
       <section className="min-h-screen bg-slate-50 py-12">
@@ -165,25 +198,16 @@ const BlogDetails = () => {
           <div className="max-w-4xl mx-auto text-center py-16 bg-white rounded-2xl shadow-sm">
             <div className="text-6xl mb-4">🔍</div>
             <h2 className="text-2xl font-bold text-slate-800">Post not found</h2>
-            <p className="text-slate-500 mt-2">
-              The blog post "{id}" doesn't exist or may have been removed.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link to="/blogs" className="text-blue-600 hover:underline font-medium">
-                ← Browse All Blogs
-              </Link>
-              <span className="text-slate-300">|</span>
-              <Link to="/" className="text-blue-600 hover:underline font-medium">
-                Go to Home
-              </Link>
-            </div>
+            <p className="text-slate-500 mt-2">The blog post you're looking for doesn't exist.</p>
+            <Link to="/blogs" className="inline-block mt-6 text-blue-600 hover:underline font-medium">
+              ← Back to Blogs
+            </Link>
           </div>
         </Container>
       </section>
     );
   }
 
-  // ===== RENDER POST =====
   return (
     <section className="min-h-screen bg-slate-50 py-12">
       <Container>
@@ -250,15 +274,20 @@ const BlogDetails = () => {
               </div>
             </div>
             <div className="flex items-center gap-4 ml-auto">
+              {/* Like Button */}
               <button
                 onClick={handleLike}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
-                  liked ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600"
+                  liked 
+                    ? "bg-red-50 text-red-600" 
+                    : "bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600"
                 }`}
               >
                 <Heart className={`w-5 h-5 ${liked ? "fill-red-600" : ""}`} />
-                <span>{post.likes || 0}</span>
+                <span className="font-semibold">{likeCount}</span>
               </button>
+              
+              {/* Share Button */}
               <button
                 onClick={handleShare}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full hover:bg-blue-50 hover:text-blue-600 transition"
@@ -266,11 +295,12 @@ const BlogDetails = () => {
                 <Share2 size={18} />
                 Share
               </button>
-<div className="flex items-center gap-1 text-sm text-slate-500">
-  <Eye size={16} className="text-blue-400" />
-  <span className="font-medium">{post.views || 0}</span>
-  <span className="text-slate-400">views</span>
-</div>
+              
+              {/* Views */}
+              <div className="flex items-center gap-1 text-sm text-slate-500">
+                <Eye size={16} />
+                {post.views || 0} views
+              </div>
             </div>
           </div>
 
@@ -305,16 +335,24 @@ const BlogDetails = () => {
                   type="text"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="Write a comment..."
-                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder={user ? "Write a comment..." : "Please login to comment"}
+                  disabled={!user}
+                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-medium"
+                  disabled={!user || !comment.trim() || submitting}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Post
                 </button>
               </div>
+              {!user && (
+                <p className="text-sm text-slate-500 mt-2">
+                  <Link to="/login" className="text-blue-600 hover:underline">Login</Link> to comment
+                </p>
+              )}
             </form>
 
             {/* Comments List */}
@@ -323,7 +361,7 @@ const BlogDetails = () => {
                 <p className="text-slate-500 text-center py-8">No comments yet. Be the first!</p>
               ) : (
                 comments.map((comment) => (
-                  <div key={comment._id} className="bg-white rounded-xl p-4 shadow-sm">
+                  <div key={comment._id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                     <div className="flex items-start gap-3">
                       {comment.user?.avatar ? (
                         <img
@@ -337,13 +375,28 @@ const BlogDetails = () => {
                         </div>
                       )}
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-800">
-                            {comment.user?.fullName || comment.user?.username || "Anonymous"}
-                          </p>
-                          <span className="text-xs text-slate-400">
-                            {formatDate(comment.createdAt)}
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-800">
+                              {comment.user?.fullName || comment.user?.username || "Anonymous"}
+                            </p>
+                            <span className="text-xs text-slate-400">
+                              {formatDate(comment.createdAt)}
+                            </span>
+                          </div>
+                          {(user?._id === comment.user?._id || user?._id === post.author?._id) && (
+                            <button
+                              onClick={() => handleDeleteComment(comment._id)}
+                              disabled={deletingComment === comment._id}
+                              className="text-slate-400 hover:text-red-600 transition disabled:opacity-50"
+                            >
+                              {deletingComment === comment._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
                         </div>
                         <p className="text-slate-600 mt-1">{comment.text}</p>
                       </div>

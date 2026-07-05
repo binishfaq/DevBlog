@@ -85,7 +85,6 @@ const MyPosts = () => {
       <Sidebar />
 
       <div className="flex-1">
-        <Navbar />
 
         <div className="p-6 md:p-8 max-w-7xl mx-auto">
           {/* Header */}

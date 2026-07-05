@@ -19,6 +19,7 @@ import NotFound from "../pages/NotFound";
 import MyPosts from "../pages/MyPosts";
 import EditPost from "../pages/EditPost";
 import Settings from "../pages/Settings";
+import AuthSuccess from "../pages/AuthSuccess"; // ✅ Add this
 
 const router = createBrowserRouter([
   {
@@ -50,15 +51,6 @@ const router = createBrowserRouter([
         path: "register",
         element: <Register />,
       },
-      {
-  path: "dashboard/settings",
-  element: (
-    <ProtectedRoute>
-      <Settings />
-    </ProtectedRoute>
-  ),
-},
-
       // ============ PROTECTED ROUTES ============
       {
         path: "dashboard",
@@ -92,7 +84,14 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      
+      {
+        path: "dashboard/settings",
+        element: (
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   {
@@ -102,6 +101,10 @@ const router = createBrowserRouter([
         <Profile />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/auth/success", // ✅ Google OAuth success page
+    element: <AuthSuccess />,
   },
 ]);
 

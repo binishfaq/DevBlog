@@ -1,6 +1,6 @@
 import express from "express";
 import protect from "../middleware/auth.middleware.js";
-
+import passport from "../config/passport.js";
 
 import {
   register,
@@ -9,6 +9,11 @@ import {
   logout,
   updateUser,
   uploadAvatar,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
+  googleAuthSuccess,
 } from "../controllers/auth.controller.js";
 
 import {
@@ -20,21 +25,13 @@ import validate from "../middleware/validate.js";
 
 const router = express.Router();
 
+// ============ AUTH ROUTES ============
+
 // Register
-router.post(
-  "/register",
-  registerValidator,
-  validate,
-  register
-);
+router.post("/register", registerValidator, validate, register);
 
 // Login
-router.post(
-  "/login",
-  loginValidator,
-  validate,
-  login
-);
+router.post("/login", loginValidator, validate, login);
 
 // Current User
 router.get("/me", protect, getCurrentUser);
@@ -42,8 +39,56 @@ router.get("/me", protect, getCurrentUser);
 // Logout
 router.post("/logout", logout);
 
+// Update User
 router.put("/update", protect, updateUser);
+
+// Upload Avatar
 router.post("/upload-avatar", protect, uploadAvatar);
 
+// ============ EMAIL VERIFICATION ROUTES ============
+
+// Verify Email
+router.get("/verify/:token", verifyEmail);
+
+// Resend Verification Email
+router.post("/resend-verification", resendVerification);
+
+// ============ PASSWORD RESET ROUTES ============
+
+// Forgot Password - Request reset link
+router.post("/forgot-password", forgotPassword);
+
+// Reset Password - Use token to reset
+router.post("/reset-password/:token", resetPassword);
+
+// ============ GOOGLE OAUTH ROUTES ============
+
+// Initiate Google OAuth
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+// Google OAuth Callback
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { session: false, failureRedirect: "/login" }),
+  googleAuthSuccess
+);
+
+// ============ GITHUB OAUTH ROUTES ============
+
+// Initiate GitHub OAuth
+router.get(
+  "/github",
+  passport.authenticate("github", { scope: ["user:email"] })
+);
+
+// GitHub OAuth Callback
+router.get(
+  "/github/callback",
+  passport.authenticate("github", { session: false, failureRedirect: "/login" }),
+  googleAuthSuccess
+);
 
 export default router;

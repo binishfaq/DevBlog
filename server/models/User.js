@@ -1,72 +1,89 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
-const userSchema = new mongoose.Schema(
-  {
-    fullName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-    },
-
-    avatar: {
-      type: String,
-      default: " ",
-    },
-
-    bio: {
-      type: String,
-      default: "",
-    },
-
-    role: {
-      type: String,
-      enum: ["user", "admin"],
-      default: "user",
-    },
-
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
+const UserSchema = new mongoose.Schema({
+  fullName: {
+    type: String,
+    required: true,
+    trim: true,
   },
-  {
-    timestamps: true,
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  bio: {
+    type: String,
+    default: "",
+    maxlength: 500,
+  },
+  avatar: {
+    type: String,
+    default: "",
+  },
+  role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    default: "",
+  },
+  verificationTokenExpires: {
+    type: Date,
+  },
+  resetPasswordToken: {
+    type: String,
+    default: "",
+  },
+  resetPasswordExpires: {
+    type: Date,
+  },
+}, { timestamps: true });
+
+// ✅ ASYNC VERSION
+UserSchema.pre("save", function(next) {
+  const user = this;
+  
+  if (!user.isModified("password")) {
+    return next();
   }
-);
-
-// Hash password before saving
-userSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
-
-  this.password = await bcrypt.hash(this.password, 10);
+  
+  bcrypt.genSalt(10, function(err, salt) {
+    if (err) return next(err);
+    
+    bcrypt.hash(user.password, salt, function(err, hash) {
+      if (err) return next(err);
+      user.password = hash;
+      next();
+    });
+  });
 });
 
-// Compare password
-userSchema.methods.comparePassword = async function (password) {
-  return await bcrypt.compare(password, this.password);
+// ✅ Compare password method
+UserSchema.methods.comparePassword = function(candidatePassword, callback) {
+  bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
+    if (err) return callback(err);
+    callback(null, isMatch);
+  });
 };
 
-export default mongoose.model("User", userSchema);
+export default mongoose.model("User", UserSchema);

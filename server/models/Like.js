@@ -1,22 +1,23 @@
 import mongoose from "mongoose";
 
-const likeSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    post: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Post",
-      required: true,
-    },
+const LikeSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Post",
+    required: true,
   },
-  {
-    timestamps: true,
-  }
-);
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
-export default mongoose.model("Like", likeSchema);
+// Prevent duplicate likes
+LikeSchema.index({ post: 1, user: 1 }, { unique: true });
+
+export default mongoose.model("Like", LikeSchema);

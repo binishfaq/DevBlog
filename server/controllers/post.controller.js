@@ -1,5 +1,5 @@
 import Post from "../models/Post.js";
-import mongoose from "mongoose";  // ✅ Add this import
+import mongoose from "mongoose";
 
 // ==================== CREATE POST ====================
 export const createPost = async (req, res) => {
@@ -13,7 +13,6 @@ export const createPost = async (req, res) => {
       });
     }
 
-    // Generate slug from title
     const slug = title
       .toLowerCase()
       .replace(/ /g, "-")
@@ -66,7 +65,6 @@ export const getMyPosts = async (req, res) => {
 // ==================== GET SINGLE POST ====================
 export const getSinglePost = async (req, res) => {
   try {
-    // Check if the ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
         success: false,
@@ -104,7 +102,6 @@ export const updatePost = async (req, res) => {
   try {
     const { title, content, category, tags, featuredImage, status } = req.body;
 
-    // Find post and check ownership
     const post = await Post.findOne({
       _id: req.params.id,
       author: req.user._id,
@@ -117,7 +114,6 @@ export const updatePost = async (req, res) => {
       });
     }
 
-    // Update slug if title changed
     let slug = post.slug;
     if (title && title !== post.title) {
       slug = title
@@ -126,7 +122,6 @@ export const updatePost = async (req, res) => {
         .replace(/[^\w-]+/g, "");
     }
 
-    // Update post
     const updatedPost = await Post.findByIdAndUpdate(
       req.params.id,
       {
@@ -183,8 +178,7 @@ export const deletePost = async (req, res) => {
   }
 };
 
-// ==================== GET POST BY SLUG (Public) ====================
-// ==================== GET POST BY SLUG (Public) ====================
+// ==================== GET POST BY SLUG ====================
 export const getPostBySlug = async (req, res) => {
   try {
     const post = await Post.findOne({
@@ -199,7 +193,8 @@ export const getPostBySlug = async (req, res) => {
       });
     }
 
-    // ✅ Increment views - this runs every time ANYONE views the post
+    // Increment views
+    if (typeof post.views !== "number") post.views = 0;
     post.views += 1;
     await post.save();
 
@@ -215,7 +210,8 @@ export const getPostBySlug = async (req, res) => {
     });
   }
 };
-// ==================== GET ALL PUBLISHED POSTS (Public) ====================
+
+// ==================== GET ALL PUBLISHED POSTS ====================
 export const getPosts = async (req, res) => {
   try {
     const { search, category, sort, page = 1, limit = 6 } = req.query;
@@ -234,7 +230,7 @@ export const getPosts = async (req, res) => {
     }
 
     let sortOption = { createdAt: -1 };
-    if (sort === "popular") sortOption = { likes: -1 };
+    if (sort === "popular") sortOption = { views: -1 };
     if (sort === "trending") sortOption = { views: -1 };
     if (sort === "oldest") sortOption = { createdAt: 1 };
 
@@ -257,124 +253,6 @@ export const getPosts = async (req, res) => {
     });
   } catch (error) {
     console.error("Get posts error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== LIKE POST ====================
-export const likePost = async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.id);
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    post.likes += 1;
-    await post.save();
-
-    res.status(200).json({
-      success: true,
-      likes: post.likes,
-    });
-  } catch (error) {
-    console.error("Like post error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== ADD COMMENT ====================
-export const addComment = async (req, res) => {
-  try {
-    const { text } = req.body;
-
-    if (!text) {
-      return res.status(400).json({
-        success: false,
-        message: "Comment text is required",
-      });
-    }
-
-    const post = await Post.findById(req.params.id);
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    post.comments.push({
-      user: req.user._id,
-      text,
-    });
-
-    await post.save();
-    await post.populate("comments.user", "username fullName avatar");
-
-    res.status(201).json({
-      success: true,
-      message: "Comment added successfully",
-      comments: post.comments,
-    });
-  } catch (error) {
-    console.error("Add comment error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== DELETE COMMENT ====================
-export const deleteComment = async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.id);
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    const comment = post.comments.id(req.params.commentId);
-
-    if (!comment) {
-      return res.status(404).json({
-        success: false,
-        message: "Comment not found",
-      });
-    }
-
-    if (
-      comment.user.toString() !== req.user._id.toString() &&
-      post.author.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    comment.deleteOne();
-    await post.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Comment deleted successfully",
-    });
-  } catch (error) {
-    console.error("Delete comment error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
