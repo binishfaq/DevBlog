@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { loginUser } from "../services/auth.service";
 
 const Login = () => {
@@ -13,6 +13,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+
+  // ✅ Check if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/dashboard");
+    }
+  }, [navigate]);
 
   // ===== EMAIL LOGIN =====
   const handleLogin = async (e) => {
@@ -38,12 +46,12 @@ const Login = () => {
 
   // ===== GOOGLE LOGIN =====
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:5000/api/auth/google";
+    window.location.href = "https://devblog-backend-nu.vercel.app/api/auth/google";
   };
 
   // ===== GITHUB LOGIN =====
   const handleGithubLogin = () => {
-    window.location.href = "http://localhost:5000/api/auth/github";
+    window.location.href = "https://devblog-backend-nu.vercel.app/api/auth/github";
   };
 
   return (
@@ -196,7 +204,7 @@ const Login = () => {
 
           {/* Social Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Google Button */}
+            {/* Google Button - Updated URL */}
             <button
               onClick={handleGoogleLogin}
               className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"
@@ -207,7 +215,7 @@ const Login = () => {
               </span>
             </button>
 
-            {/* GitHub Button */}
+            {/* GitHub Button - Updated URL */}
             <button
               onClick={handleGithubLogin}
               className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"
