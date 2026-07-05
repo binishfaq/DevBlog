@@ -1,13 +1,13 @@
 import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
-// ✅ Remove email imports
-// import crypto from "crypto";
-// import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email.js";
+import bcrypt from "bcryptjs";
 
 // ==================== REGISTER ====================
 export const register = async (req, res) => {
   try {
     const { fullName, username, email, password } = req.body;
+
+    console.log("📝 Registration attempt for:", email);
 
     // Check existing user
     const existingUser = await User.findOne({
@@ -21,19 +21,22 @@ export const register = async (req, res) => {
       });
     }
 
-    // ✅ Create user WITHOUT email verification
+    // ✅ Hash password in controller
+    const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync(password, salt);
+    console.log("✅ Password hashed for:", email);
+
+    // Create user with hashed password
     const user = await User.create({
       fullName,
       username,
       email,
-      password,
-      isVerified: true, // ✅ Auto-verified
+      password: hashedPassword,
+      isVerified: true,
     });
 
-    // ✅ Remove verification token generation
-    // ✅ Remove email sending
+    console.log("✅ User created:", user.email);
 
-    // Generate JWT
     const token = generateToken(user._id);
 
     return res.status(201).json({
@@ -50,7 +53,7 @@ export const register = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Register error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -63,44 +66,32 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ email });
+    console.log("🔐 Login attempt for:", email);
 
+    const user = await User.findOne({ email });
     if (!user) {
+      console.log("❌ User not found:", email);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    // ✅ Remove email verification check
-    // if (!user.isVerified) {
-    //   return res.status(401).json({
-    //     success: false,
-    //     message: "Please verify your email before logging in.",
-    //   });
-    // }
+    console.log("✅ User found:", user.email);
 
-    // Compare password
-    const isMatch = await user.comparePassword(password);
+    // ✅ Compare password using bcrypt directly
+    const isMatch = bcrypt.compareSync(password, user.password);
+    console.log("🔑 Password match:", isMatch);
 
     if (!isMatch) {
+      console.log("❌ Password mismatch for:", email);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    // Generate JWT
     const token = generateToken(user._id);
-
-    // Store cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
 
     return res.status(200).json({
       success: true,
@@ -116,7 +107,7 @@ export const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Login error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -164,7 +155,6 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    // Check if username is taken
     if (username && username !== user.username) {
       const existingUser = await User.findOne({ username });
       if (existingUser) {
@@ -175,7 +165,6 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    // Check if email is taken
     if (email && email !== user.email) {
       const existingUser = await User.findOne({ email });
       if (existingUser) {
@@ -186,7 +175,6 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    // Update fields
     if (fullName) user.fullName = fullName;
     if (username) user.username = username;
     if (email) user.email = email;
@@ -220,7 +208,6 @@ export const updateUser = async (req, res) => {
 // ==================== LOGOUT ====================
 export const logout = async (req, res) => {
   res.clearCookie("token");
-
   return res.status(200).json({
     success: true,
     message: "Logout successful",
@@ -264,75 +251,6 @@ export const uploadAvatar = async (req, res) => {
   }
 };
 
-// ==================== FORGOT PASSWORD ====================
-export const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await user.save();
-
-    await sendPasswordResetEmail(user.email, user.fullName || user.username, resetToken);
-
-    return res.status(200).json({
-      success: true,
-      message: "Password reset email sent",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== RESET PASSWORD ====================
-export const resetPassword = async (req, res) => {
-  try {
-    const { token } = req.params;
-    const { newPassword } = req.body;
-
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired reset token",
-      });
-    }
-
-    user.password = newPassword;
-    user.resetPasswordToken = "";
-    user.resetPasswordExpires = null;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Password reset successfully",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
 // ==================== GOOGLE OAUTH SUCCESS ====================
 export const googleAuthSuccess = async (req, res) => {
   try {
@@ -341,7 +259,6 @@ export const googleAuthSuccess = async (req, res) => {
 
     console.log("✅ Google auth success for:", user.email);
 
-    // Redirect to frontend with token
     res.redirect(
       `${process.env.CLIENT_URL}/auth/success?token=${token}&user=${encodeURIComponent(
         JSON.stringify({

@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 
 const UserSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true },
@@ -16,35 +15,6 @@ const UserSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date },
 }, { timestamps: true });
 
-// ✅ FIX: Hash password before saving
-UserSchema.pre("save", function(next) {
-  // Only hash if password is modified
-  if (!this.isModified("password")) {
-    return next();
-  }
-
-  try {
-    const salt = bcrypt.genSaltSync(10);
-    this.password = bcrypt.hashSync(this.password, salt);
-    console.log("✅ Password hashed for:", this.email);
-    next();
-  } catch (error) {
-    console.error("❌ Password hashing error:", error);
-    next(error);
-  }
-});
-
-// ✅ Compare password method
-UserSchema.methods.comparePassword = function(candidatePassword) {
-  try {
-    if (!candidatePassword || !this.password) {
-      return false;
-    }
-    return bcrypt.compareSync(candidatePassword, this.password);
-  } catch (error) {
-    console.error("❌ Compare password error:", error);
-    return false;
-  }
-};
+// ✅ No pre-save hook - password hashing done in controller
 
 export default mongoose.model("User", UserSchema);

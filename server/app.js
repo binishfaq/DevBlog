@@ -18,11 +18,21 @@ const app = express();
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
-const allowedOrigin = process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://client-black-six-10.vercel.app",
+  "https://devblog-backend-nu.vercel.app",
+  "https://devblog-frontend.vercel.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
