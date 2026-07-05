@@ -1,7 +1,8 @@
 import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
-import crypto from "crypto";
-import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email.js";
+// ✅ Remove email imports
+// import crypto from "crypto";
+// import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email.js";
 
 // ==================== REGISTER ====================
 export const register = async (req, res) => {
@@ -20,34 +21,24 @@ export const register = async (req, res) => {
       });
     }
 
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    // Create user
+    // ✅ Create user WITHOUT email verification
     const user = await User.create({
       fullName,
       username,
       email,
       password,
-      verificationToken,
-      verificationTokenExpires,
+      isVerified: true, // ✅ Auto-verified
     });
 
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, fullName || username, verificationToken);
-    } catch (error) {
-      console.error("Email send failed:", error);
-      // Continue registration even if email fails
-    }
+    // ✅ Remove verification token generation
+    // ✅ Remove email sending
 
     // Generate JWT
     const token = generateToken(user._id);
 
     return res.status(201).json({
       success: true,
-      message: "Registration successful! Please verify your email.",
+      message: "Registration successful!",
       token,
       user: {
         id: user._id,
@@ -82,13 +73,13 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if email is verified
-    if (!user.isVerified) {
-      return res.status(401).json({
-        success: false,
-        message: "Please verify your email before logging in. Check your inbox.",
-      });
-    }
+    // ✅ Remove email verification check
+    // if (!user.isVerified) {
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: "Please verify your email before logging in.",
+    //   });
+    // }
 
     // Compare password
     const isMatch = await user.comparePassword(password);
@@ -267,81 +258,6 @@ export const uploadAvatar = async (req, res) => {
   } catch (error) {
     console.error("Upload avatar error:", error);
     res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== VERIFY EMAIL ====================
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationTokenExpires: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired verification token",
-      });
-    }
-
-    user.isVerified = true;
-    user.verificationToken = "";
-    user.verificationTokenExpires = null;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Email verified successfully! You can now login.",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== RESEND VERIFICATION ====================
-export const resendVerification = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: "Email already verified",
-      });
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    user.verificationToken = verificationToken;
-    user.verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await user.save();
-
-    await sendVerificationEmail(user.email, user.fullName || user.username, verificationToken);
-
-    return res.status(200).json({
-      success: true,
-      message: "Verification email resent successfully",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
       success: false,
       message: error.message,
     });
