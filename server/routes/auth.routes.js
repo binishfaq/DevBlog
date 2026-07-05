@@ -9,8 +9,6 @@ import {
   logout,
   updateUser,
   uploadAvatar,
-  verifyEmail,
-  resendVerification,
   forgotPassword,
   resetPassword,
   googleAuthSuccess,
@@ -44,14 +42,6 @@ router.put("/update", protect, updateUser);
 
 // Upload Avatar
 router.post("/upload-avatar", protect, uploadAvatar);
-
-// ============ EMAIL VERIFICATION ROUTES ============
-
-// Verify Email
-router.get("/verify/:token", verifyEmail);
-
-// Resend Verification Email
-router.post("/resend-verification", resendVerification);
 
 // ============ PASSWORD RESET ROUTES ============
 
