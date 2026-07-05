@@ -16,10 +16,10 @@ const UserSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date },
 }, { timestamps: true });
 
-// ✅ Hash password before saving - FIXED
+// ✅ FIX: Hash password before saving
 UserSchema.pre("save", function(next) {
-  // Only hash if password is modified and exists
-  if (!this.isModified("password") || !this.password) {
+  // Only hash if password is modified
+  if (!this.isModified("password")) {
     return next();
   }
 
@@ -35,15 +35,12 @@ UserSchema.pre("save", function(next) {
 });
 
 // ✅ Compare password method
-UserSchema.methods.comparePassword = function(password) {
+UserSchema.methods.comparePassword = function(candidatePassword) {
   try {
-    if (!password || !this.password) {
-      console.log("❌ Missing password for comparison");
+    if (!candidatePassword || !this.password) {
       return false;
     }
-    const result = bcrypt.compareSync(password, this.password);
-    console.log("🔑 Password comparison result:", result);
-    return result;
+    return bcrypt.compareSync(candidatePassword, this.password);
   } catch (error) {
     console.error("❌ Compare password error:", error);
     return false;
