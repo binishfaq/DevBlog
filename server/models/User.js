@@ -10,9 +10,13 @@ const UserSchema = new mongoose.Schema({
   avatar: { type: String, default: "" },
   role: { type: String, enum: ["user", "admin"], default: "user" },
   isVerified: { type: Boolean, default: true },
+  verificationToken: { type: String, default: "" },
+  verificationTokenExpires: { type: Date },
+  resetPasswordToken: { type: String, default: "" },
+  resetPasswordExpires: { type: Date },
 }, { timestamps: true });
 
-// ✅ Hash password before saving
+// ✅ Hash password before saving - FIXED
 UserSchema.pre("save", function(next) {
   // Only hash if password is modified and exists
   if (!this.isModified("password") || !this.password) {
@@ -30,7 +34,7 @@ UserSchema.pre("save", function(next) {
   }
 });
 
-// ✅ Compare password method - FIXED
+// ✅ Compare password method
 UserSchema.methods.comparePassword = function(password) {
   try {
     if (!password || !this.password) {
