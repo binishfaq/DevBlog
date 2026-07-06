@@ -1,25 +1,49 @@
 import api from "../api/axios";
 
+// Login user
+export const loginUser = async (credentials) => {
+  try {
+    console.log("📝 loginUser called with:", credentials);
+    const response = await api.post("/auth/login", credentials);
+    console.log("✅ loginUser response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ loginUser error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Register user
 export const registerUser = async (userData) => {
-  const response = await api.post("/auth/register", userData);
-  console.log(userData);
-console.log(JSON.stringify(userData, null, 2));
-  return response.data;
+  try {
+    console.log("📝 registerUser called with:", userData);
+    const response = await api.post("/auth/register", userData);
+    console.log("✅ registerUser response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ registerUser error:", error.response?.data || error.message);
+    throw error;
+  }
 };
 
-export const loginUser = async (userData) => {
-  const response = await api.post("/auth/login", userData);
-  console.log(userData);
-console.log(JSON.stringify(userData, null, 2));
-  return response.data;
-};
-
-export const logoutUser = async () => {
-  const response = await api.post("/auth/logout");
-  return response.data;
-};
-
+// Get current user
 export const getCurrentUser = async () => {
-  const response = await api.get("/auth/me");
-  return response.data;
+  try {
+    const response = await api.get("/auth/me");
+    return response.data;
+  } catch (error) {
+    console.error("❌ getCurrentUser error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Update user profile
+export const updateUserProfile = async (userData) => {
+  try {
+    const response = await api.put("/auth/update", userData);
+    return response.data;
+  } catch (error) {
+    console.error("❌ updateUserProfile error:", error.response?.data || error.message);
+    throw error;
+  }
 };

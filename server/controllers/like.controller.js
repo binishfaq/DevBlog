@@ -1,5 +1,5 @@
 import Like from "../models/Like.js";
-import Post from "../models/Post.js";
+import Post from "../models/Post.model.js";
 
 // ==================== TOGGLE LIKE ====================
 export const toggleLike = async (req, res) => {

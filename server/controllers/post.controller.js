@@ -1,279 +1,283 @@
-import Post from "../models/Post.js";
-import mongoose from "mongoose";
+import mongoose from "mongoose"; // ✅ IMPORT MONGOOSE
+import Post from "../models/Post.model.js";
 
-// ==================== CREATE POST ====================
-export const createPost = async (req, res) => {
-  try {
-    const { title, content, category, tags, featuredImage, status } = req.body;
-
-    if (!title || !content || !category) {
-      return res.status(400).json({
-        success: false,
-        message: "Title, content, and category are required",
-      });
-    }
-
-    const slug = title
-      .toLowerCase()
-      .replace(/ /g, "-")
-      .replace(/[^\w-]+/g, "");
-
-    const post = await Post.create({
-      title,
-      slug,
-      content,
-      category,
-      tags: tags || [],
-      featuredImage: featuredImage || "",
-      status: status || "draft",
-      author: req.user._id,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Post created successfully",
-      post,
-    });
-  } catch (error) {
-    console.error("Create post error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== GET MY POSTS ====================
-export const getMyPosts = async (req, res) => {
-  try {
-    const posts = await Post.find({ author: req.user._id })
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      posts,
-    });
-  } catch (error) {
-    console.error("Get my posts error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== GET SINGLE POST ====================
-export const getSinglePost = async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid post ID format",
-      });
-    }
-
-    const post = await Post.findOne({
-      _id: req.params.id,
-      author: req.user._id,
-    });
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      post,
-    });
-  } catch (error) {
-    console.error("Get single post error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== UPDATE POST ====================
-export const updatePost = async (req, res) => {
-  try {
-    const { title, content, category, tags, featuredImage, status } = req.body;
-
-    const post = await Post.findOne({
-      _id: req.params.id,
-      author: req.user._id,
-    });
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    let slug = post.slug;
-    if (title && title !== post.title) {
-      slug = title
-        .toLowerCase()
-        .replace(/ /g, "-")
-        .replace(/[^\w-]+/g, "");
-    }
-
-    const updatedPost = await Post.findByIdAndUpdate(
-      req.params.id,
-      {
-        title: title || post.title,
-        slug,
-        content: content || post.content,
-        category: category || post.category,
-        tags: tags || post.tags,
-        featuredImage: featuredImage !== undefined ? featuredImage : post.featuredImage,
-        status: status || post.status,
-      },
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Post updated successfully",
-      post: updatedPost,
-    });
-  } catch (error) {
-    console.error("Update post error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== DELETE POST ====================
-export const deletePost = async (req, res) => {
-  try {
-    const post = await Post.findOneAndDelete({
-      _id: req.params.id,
-      author: req.user._id,
-    });
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Post deleted successfully",
-    });
-  } catch (error) {
-    console.error("Delete post error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== GET POST BY SLUG ====================
-export const getPostBySlug = async (req, res) => {
-  try {
-    const post = await Post.findOne({
-      slug: req.params.slug,
-      status: "published",
-    }).populate("author", "username fullName email avatar bio role");
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-      });
-    }
-
-    // Increment views
-    if (typeof post.views !== "number") post.views = 0;
-    post.views += 1;
-    await post.save();
-
-    res.status(200).json({
-      success: true,
-      post,
-    });
-  } catch (error) {
-    console.error("Get post by slug error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ==================== GET ALL PUBLISHED POSTS ====================
+// ============================================
+// GET ALL POSTS
+// ============================================
 export const getPosts = async (req, res) => {
   try {
-    const { search, category, sort, page = 1, limit = 6 } = req.query;
-    let query = { status: "published" };
-
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { content: { $regex: search, $options: "i" } },
-        { tags: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    if (category && category !== "all") {
-      query.category = category;
-    }
-
-    let sortOption = { createdAt: -1 };
-    if (sort === "popular") sortOption = { views: -1 };
-    if (sort === "trending") sortOption = { views: -1 };
-    if (sort === "oldest") sortOption = { createdAt: 1 };
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const total = await Post.countDocuments(query);
-    const totalPages = Math.ceil(total / parseInt(limit));
-
-    const posts = await Post.find(query)
-      .populate("author", "username fullName email avatar bio role createdAt")
-      .sort(sortOption)
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    res.status(200).json({
-      success: true,
-      posts,
-      total,
-      totalPages,
-      currentPage: parseInt(page),
-    });
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .populate('createdBy', 'fullName username email avatar');
+    res.json(posts);
   } catch (error) {
-    console.error("Get posts error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.error("Error fetching posts:", error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// ==================== GET CATEGORIES ====================
+// ============================================
+// GET CURRENT USER'S POSTS
+// ============================================
+export const getMyPosts = async (req, res) => {
+  try {
+    const posts = await Post.find({ createdBy: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('createdBy', 'fullName username email avatar');
+    res.json(posts);
+  } catch (error) {
+    console.error("Error fetching my posts:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// GET SINGLE POST BY ID
+// ============================================
+export const getPostById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log("📡 Fetching post with ID:", id);
+    
+    // ✅ Check if ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid post ID format" });
+    }
+    
+    const post = await Post.findById(id)
+      .populate('createdBy', 'fullName username email avatar bio')
+      .populate('comments.user', 'fullName username avatar');
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // ✅ Increment views
+    post.views = (post.views || 0) + 1;
+    await post.save();
+    
+    res.json(post);
+  } catch (error) {
+    console.error("Error fetching post by ID:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// GET POST BY SLUG
+// ============================================
+export const getPostBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    console.log("📡 Fetching post with slug:", slug);
+    
+    const post = await Post.findOne({ slug })
+      .populate('createdBy', 'fullName username email avatar bio')
+      .populate('comments.user', 'fullName username avatar');
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // ✅ Increment views
+    post.views = (post.views || 0) + 1;
+    await post.save();
+    
+    res.json(post);
+  } catch (error) {
+    console.error("Error fetching post by slug:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+// ============================================
+// CREATE POST
+// ============================================
+const generateSlug = (title) => {
+  return title
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .replace(/\s+/g, '-')
+    .trim();
+};
+
+export const createPost = async (req, res) => {
+  try {
+    const { title, content, author, image, tags, category, status } = req.body;
+    
+    console.log("📝 Creating post with data:", req.body);
+    
+    let slug = generateSlug(title);
+    const existingPost = await Post.findOne({ slug });
+    if (existingPost) {
+      slug = `${slug}-${Date.now()}`;
+    }
+    
+    let tagsArray = [];
+    if (typeof tags === 'string') {
+      tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    } else if (Array.isArray(tags)) {
+      tagsArray = tags;
+    }
+    
+    const post = await Post.create({
+      title: title.trim(),
+      content: content.trim(),
+      author: author || req.user.fullName,
+      image: image || "https://via.placeholder.com/800x400",
+      tags: tagsArray,
+      category: category || "General",
+      slug: slug,
+      status: status || "published",
+      createdBy: req.user._id
+    });
+    
+    console.log("✅ Post created:", post);
+    res.status(201).json(post);
+  } catch (error) {
+    console.error('Create post error:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// ============================================
+// UPDATE POST
+// ============================================
+export const updatePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    if (post.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    if (req.body.title && req.body.title !== post.title) {
+      const slug = generateSlug(req.body.title);
+      const existingPost = await Post.findOne({ slug, _id: { $ne: req.params.id } });
+      req.body.slug = existingPost ? `${slug}-${Date.now()}` : slug;
+    }
+    
+    const updatedPost = await Post.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    
+    res.json(updatedPost);
+  } catch (error) {
+    console.error("Update post error:", error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// ============================================
+// DELETE POST
+// ============================================
+export const deletePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    if (post.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    await post.deleteOne();
+    res.json({ message: "Post deleted successfully" });
+  } catch (error) {
+    console.error("Delete post error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// TOGGLE LIKE
+// ============================================
+export const toggleLike = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const userIndex = post.likes.indexOf(req.user._id);
+    
+    if (userIndex > -1) {
+      post.likes.splice(userIndex, 1);
+    } else {
+      post.likes.push(req.user._id);
+    }
+    
+    await post.save();
+    res.json({ likes: post.likes.length });
+  } catch (error) {
+    console.error("Toggle like error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// ADD COMMENT
+// ============================================
+export const addComment = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    post.comments.push({
+      user: req.user._id,
+      text: req.body.text
+    });
+    
+    await post.save();
+    await post.populate('comments.user', 'fullName username avatar');
+    res.status(201).json(post.comments);
+  } catch (error) {
+    console.error("Add comment error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// GET CATEGORIES
+// ============================================
 export const getCategories = async (req, res) => {
   try {
-    const categories = await Post.distinct("category", { status: "published" });
-
-    res.status(200).json({
-      success: true,
-      categories,
-    });
+    const categoryCounts = await Post.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    
+    const result = categoryCounts.map(item => ({
+      name: item._id || 'Uncategorized',
+      count: item.count
+    }));
+    
+    res.json(result);
   } catch (error) {
     console.error("Get categories error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================
+// GET ALL CATEGORIES (SIMPLE LIST)
+// ============================================
+export const getAllCategories = async (req, res) => {
+  try {
+    const categories = await Post.distinct('category');
+    res.json(categories.filter(c => c && c.trim() !== ''));
+  } catch (error) {
+    console.error("Get all categories error:", error);
+    res.status(500).json({ message: error.message });
   }
 };

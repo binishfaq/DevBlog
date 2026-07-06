@@ -11,6 +11,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
@@ -23,27 +24,51 @@ const Login = () => {
   }, [navigate]);
 
   // ===== EMAIL LOGIN =====
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+// Update the handleLogin function in Login.jsx
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      const data = await loginUser({
-        email,
-        password,
-      });
+  try {
+    const data = await loginUser({
+      email,
+      password,
+    });
 
+    console.log("📝 Login response:", data);
+
+    if (data.token) {
+      // ✅ Save token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-
+      
+      // ✅ Save user data with consistent structure
+      const userData = {
+        id: data._id || data.id,
+        _id: data._id,
+        fullName: data.fullName,
+        username: data.username,
+        email: data.email,
+        avatar: data.avatar,
+        bio: data.bio,
+        role: data.role,
+        isVerified: data.isVerified
+      };
+      
+      localStorage.setItem("user", JSON.stringify(userData));
+      console.log("✅ User data saved:", userData);
+      
       navigate("/dashboard");
-    } catch (error) {
-      alert(error.response?.data?.message || "Login Failed");
-    } finally {
-      setLoading(false);
+    } else {
+      setError("Invalid response from server");
     }
-  };
-
+  } catch (error) {
+    console.error("❌ Login error:", error);
+    setError(error.response?.data?.message || "Login Failed. Please check your credentials.");
+  } finally {
+    setLoading(false);
+  }
+};
   // ===== GOOGLE LOGIN =====
   const handleGoogleLogin = () => {
     window.location.href = "https://devblog-backend-nu.vercel.app/api/auth/google";
@@ -117,6 +142,13 @@ const Login = () => {
               Sign in to access your learning dashboard
             </p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl">
+              {error}
+            </div>
+          )}
 
           {/* Form */}
           <form className="space-y-4" onSubmit={handleLogin}>
@@ -204,7 +236,6 @@ const Login = () => {
 
           {/* Social Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Google Button - Updated URL */}
             <button
               onClick={handleGoogleLogin}
               className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"
@@ -215,7 +246,6 @@ const Login = () => {
               </span>
             </button>
 
-            {/* GitHub Button - Updated URL */}
             <button
               onClick={handleGithubLogin}
               className="group relative flex items-center justify-center gap-3 border border-gray-200 bg-white/50 backdrop-blur-sm rounded-xl py-3 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md transition-all duration-300"

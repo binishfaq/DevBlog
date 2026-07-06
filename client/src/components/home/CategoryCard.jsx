@@ -1,33 +1,16 @@
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 
 const CategoryCard = ({ icon: Icon, title, count, color }) => {
   return (
     <Link
       to={`/category/${title.toLowerCase()}`}
-      className="group bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
+      className="group bg-white rounded-lg border border-slate-200 px-2.5 py-2 shadow-sm hover:shadow-lg transition-shadow duration-300 flex items-center gap-2.5"
     >
-      <div
-        className={`w-16 h-16 rounded-2xl ${color} flex items-center justify-center text-white`}
-      >
-        <Icon size={30} />
+      <div className={`w-7 h-7 rounded-lg ${color} flex items-center justify-center text-white flex-shrink-0`}>
+        <Icon size={15} />
       </div>
-
-      <h3 className="mt-5 text-xl font-bold text-slate-900">
-        {title}
-      </h3>
-
-      <p className="mt-2 text-slate-500">
-        {count} Articles
-      </p>
-
-      <div className="mt-6 flex items-center text-blue-600 font-semibold">
-        Explore
-        <ArrowRight
-          size={18}
-          className="ml-2 group-hover:translate-x-1 transition"
-        />
-      </div>
+      <span className="text-xs font-medium text-slate-700 truncate">{title}</span>
+      <span className="text-[10px] text-slate-400 ml-auto">{count}</span>
     </Link>
   );
 };

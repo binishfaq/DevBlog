@@ -4,18 +4,38 @@ import { ArrowRight, Calendar, User, Clock, Eye, Heart } from "lucide-react";
 const FeaturedBlogs = ({ blogs = [], loading = false }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
   };
 
   const getReadTime = (content) => {
     if (!content) return "1 min read";
-    const wordCount = content.replace(/<[^>]*>/g, "").split(/\s+/).length || 0;
-    const minutes = Math.ceil(wordCount / 200);
-    return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    try {
+      // Strip HTML tags and count words
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      const wordCount = text ? text.split(/\s+/).length : 0;
+      const minutes = Math.ceil(wordCount / 200);
+      return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    } catch (error) {
+      return "1 min read";
+    }
+  };
+
+  const stripHtml = (html) => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>/g, "").trim();
+  };
+
+  const truncateText = (text, maxLength = 120) => {
+    if (!text) return "";
+    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
   };
 
   if (loading) {
@@ -71,32 +91,44 @@ const FeaturedBlogs = ({ blogs = [], loading = false }) => {
                 to={`/blogs/${blog.slug || blog._id}`}
                 className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-slate-100 transition-all duration-300 hover:-translate-y-1"
               >
-                {blog.featuredImage && (
+                {blog.image && (
                   <div className="h-48 overflow-hidden">
                     <img
-                      src={blog.featuredImage}
+                      src={blog.image}
                       alt={blog.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/800x400?text=No+Image";
+                      }}
                     />
                   </div>
                 )}
                 <div className="p-6">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                      {blog.category}
+                      {blog.category || "General"}
                     </span>
+                    {blog.status && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        blog.status === "published" 
+                          ? "bg-green-100 text-green-700" 
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {blog.status}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
                     {blog.title}
                   </h3>
                   <p className="text-slate-600 text-sm mt-2 line-clamp-2">
-                    {blog.content?.replace(/<[^>]*>/g, "").substring(0, 120)}...
+                    {truncateText(stripHtml(blog.content), 120)}
                   </p>
                   <div className="flex items-center gap-3 mt-4 text-sm text-slate-500">
                     <span className="flex items-center gap-1">
                       <User className="w-3.5 h-3.5" />
-                      {blog.author?.username || "Anonymous"}
+                      {blog.author || blog.createdBy?.fullName || blog.createdBy?.username || "Anonymous"}
                     </span>
                     <span>•</span>
                     <span>{formatDate(blog.createdAt)}</span>
@@ -108,7 +140,7 @@ const FeaturedBlogs = ({ blogs = [], loading = false }) => {
                     </span>
                     <span className="flex items-center gap-1">
                       <Heart className="w-3.5 h-3.5 text-red-400" />
-                      {blog.likes || 0}
+                      {blog.likes?.length || blog.likes || 0}
                     </span>
                     <span className="flex items-center gap-1">
                       <Eye className="w-3.5 h-3.5 text-blue-400" />

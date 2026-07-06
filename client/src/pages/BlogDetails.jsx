@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { 
   Calendar, User, Clock, Heart, Eye, Share2, MessageCircle, 
-  ArrowLeft, ThumbsUp, Send, Loader2, Trash2 
+  ArrowLeft, Send, Loader2, Trash2 
 } from "lucide-react";
 import Container from "../components/layout/Container";
-import api from "../api/axios";
+import { getSinglePost, likePost, addComment, deleteComment } from "../services/post.service";
 
 const BlogDetails = () => {
   const { id } = useParams();
@@ -20,7 +20,6 @@ const BlogDetails = () => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Get current user
     const userData = localStorage.getItem("user");
     if (userData) {
       try {
@@ -36,102 +35,85 @@ const BlogDetails = () => {
     try {
       setLoading(true);
       
-      // Try by slug first
-      try {
-        const response = await api.get(`/posts/slug/${id}`);
-        setPost(response.data.post);
-        setComments(response.data.post.comments || []);
-        setLikeCount(response.data.post.likes || 0);
-        setLoading(false);
-        return;
-      } catch (slugError) {
-        console.log("Not found by slug, trying by ID...");
-      }
-
-      // Try by ID
-      try {
-        const response = await api.get(`/posts/${id}`);
-        setPost(response.data.post);
-        setComments(response.data.post.comments || []);
-        setLikeCount(response.data.post.likes || 0);
-      } catch (idError) {
-        console.error("Post not found:", idError);
+      const data = await getSinglePost(id);
+      
+      if (data) {
+        setPost(data);
+        setComments(data.comments || []);
+        
+        if (user && data.likes && Array.isArray(data.likes)) {
+          const userLiked = data.likes.includes(user._id || user.id);
+          setLiked(userLiked);
+        }
+        setLikeCount(data.likes?.length || 0);
+      } else {
         setPost(null);
       }
     } catch (error) {
-      console.error("Error fetching post:", error);
+      console.error("❌ Error fetching post:", error);
       setPost(null);
     } finally {
       setLoading(false);
     }
   };
 
- // ===== LIKE HANDLER =====
-const handleLike = async () => {
-  if (!post) return;
-  
-  if (!user) {
-    alert("Please login to like posts");
-    return;
-  }
-
-  try {
-    // ✅ Updated endpoint
-    const response = await api.post(`/likes/${post._id}/toggle`);
-    setLiked(response.data.liked);
-    setLikeCount(response.data.likes);
-  } catch (error) {
-    console.error("Error liking post:", error);
-    if (error.response?.status === 401) {
+  // ===== LIKE HANDLER =====
+  const handleLike = async () => {
+    if (!post) return;
+    if (!user) {
       alert("Please login to like posts");
+      return;
     }
-  }
-};
 
-// ===== COMMENT HANDLER =====
-const handleComment = async (e) => {
-  e.preventDefault();
-  if (!comment.trim() || !post) return;
+    try {
+      const response = await likePost(post._id);
+      setLiked(response.liked);
+      setLikeCount(response.likes);
+    } catch (error) {
+      console.error("Error liking post:", error);
+      if (error.response?.status === 401) {
+        alert("Please login to like posts");
+      }
+    }
+  };
 
-  if (!user) {
-    alert("Please login to comment");
-    return;
-  }
-
-  try {
-    setSubmitting(true);
-    // ✅ Updated endpoint
-    const response = await api.post(`/comments/${post._id}`, { text: comment });
-    setComments(response.data.comments);
-    setComment("");
-  } catch (error) {
-    console.error("Error adding comment:", error);
-    if (error.response?.status === 401) {
+  // ===== COMMENT HANDLER =====
+  const handleComment = async (e) => {
+    e.preventDefault();
+    if (!comment.trim() || !post) return;
+    if (!user) {
       alert("Please login to comment");
-    } else {
-      alert("Failed to add comment");
+      return;
     }
-  } finally {
-    setSubmitting(false);
-  }
-};
 
-// ===== DELETE COMMENT =====
-const handleDeleteComment = async (commentId) => {
-  if (!window.confirm("Delete this comment?")) return;
-  
-  try {
-    setDeletingComment(commentId);
-    // ✅ Updated endpoint
-    await api.delete(`/comments/${commentId}`);
-    setComments(comments.filter(c => c._id !== commentId));
-  } catch (error) {
-    console.error("Error deleting comment:", error);
-    alert("Failed to delete comment");
-  } finally {
-    setDeletingComment(null);
-  }
-};
+    try {
+      setSubmitting(true);
+      const newComments = await addComment(post._id, comment);
+      setComments(newComments);
+      setComment("");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      alert("Failed to add comment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ===== DELETE COMMENT =====
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Delete this comment?")) return;
+    
+    try {
+      setDeletingComment(commentId);
+      await deleteComment(commentId);
+      setComments(comments.filter(c => c._id !== commentId));
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      alert("Failed to delete comment");
+    } finally {
+      setDeletingComment(null);
+    }
+  };
 
   // ===== SHARE HANDLER =====
   const handleShare = () => {
@@ -151,23 +133,120 @@ const handleDeleteComment = async (commentId) => {
   // Helper functions
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "N/A";
+    }
   };
 
   const getReadTime = (content) => {
     if (!content) return "1 min read";
-    const wordCount = content.replace(/<[^>]*>/g, "").split(/\s+/).length || 0;
-    const minutes = Math.ceil(wordCount / 200);
-    return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    try {
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      const wordCount = text ? text.split(/\s+/).length : 0;
+      const minutes = Math.ceil(wordCount / 200);
+      return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    } catch (error) {
+      return "1 min read";
+    }
   };
 
   const getInitials = (name) => {
     if (!name) return "U";
     return name.charAt(0).toUpperCase();
+  };
+
+  const hasImageInContent = (content) => {
+    if (!content) return false;
+    return content.includes('<img');
+  };
+
+  const getImageUrl = () => {
+    if (!post) return null;
+    if (hasImageInContent(post.content)) {
+      return null;
+    }
+    return post.image || post.featuredImage || null;
+  };
+
+  // ✅ Get author name with priority: fullName > username > author string
+  const getAuthorName = () => {
+    if (!post) return "Unknown User";
+    
+    // Check if author is populated (object with fullName)
+    if (post.author && typeof post.author === 'object') {
+      if (post.author.fullName) return post.author.fullName;
+      if (post.author.username) return post.author.username;
+    }
+    
+    // Check if author is a string
+    if (typeof post.author === 'string') return post.author;
+    
+    // Check if createdBy is populated
+    if (post.createdBy && typeof post.createdBy === 'object') {
+      if (post.createdBy.fullName) return post.createdBy.fullName;
+      if (post.createdBy.username) return post.createdBy.username;
+    }
+    
+    return "Unknown User";
+  };
+
+  // ✅ Get author avatar
+  const getAuthorAvatar = () => {
+    if (!post) return null;
+    
+    if (post.author && typeof post.author === 'object') {
+      return post.author.avatar || null;
+    }
+    
+    if (post.createdBy && typeof post.createdBy === 'object') {
+      return post.createdBy.avatar || null;
+    }
+    
+    return null;
+  };
+
+  // ✅ Get author bio
+  const getAuthorBio = () => {
+    if (!post) return null;
+    
+    if (post.author && typeof post.author === 'object') {
+      return post.author.bio || null;
+    }
+    
+    if (post.createdBy && typeof post.createdBy === 'object') {
+      return post.createdBy.bio || null;
+    }
+    
+    return null;
+  };
+
+  // ✅ Get comment author name
+  const getCommentAuthorName = (comment) => {
+    if (!comment) return "Unknown User";
+    
+    if (comment.user && typeof comment.user === 'object') {
+      if (comment.user.fullName) return comment.user.fullName;
+      if (comment.user.username) return comment.user.username;
+    }
+    
+    return "Unknown User";
+  };
+
+  // ✅ Get comment author avatar
+  const getCommentAuthorAvatar = (comment) => {
+    if (!comment) return null;
+    
+    if (comment.user && typeof comment.user === 'object') {
+      return comment.user.avatar || null;
+    }
+    
+    return null;
   };
 
   if (loading) {
@@ -208,6 +287,11 @@ const handleDeleteComment = async (commentId) => {
     );
   }
 
+  const authorName = getAuthorName();
+  const authorAvatar = getAuthorAvatar();
+  const authorBio = getAuthorBio();
+  const imageUrl = getImageUrl();
+
   return (
     <section className="min-h-screen bg-slate-50 py-12">
       <Container>
@@ -222,12 +306,15 @@ const handleDeleteComment = async (commentId) => {
           </Link>
 
           {/* Featured Image */}
-          {post.featuredImage && (
-            <div className="rounded-2xl overflow-hidden mb-8 shadow-lg">
+          {imageUrl && (
+            <div className="rounded-2xl overflow-hidden mb-8 shadow-lg bg-slate-100">
               <img
-                src={post.featuredImage}
+                src={imageUrl}
                 alt={post.title}
                 className="w-full h-[400px] object-cover"
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/1200x400?text=No+Image";
+                }}
               />
             </div>
           )}
@@ -235,7 +322,7 @@ const handleDeleteComment = async (commentId) => {
           {/* Category Badge */}
           <div className="flex items-center gap-3 mb-4">
             <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              {post.category}
+              {post.category || "General"}
             </span>
             <span className="text-sm text-slate-400">•</span>
             <span className="text-sm text-slate-500 flex items-center gap-1">
@@ -252,38 +339,40 @@ const handleDeleteComment = async (commentId) => {
           {/* Author & Meta */}
           <div className="flex flex-wrap items-center gap-6 pb-6 border-b border-slate-200 mb-8">
             <div className="flex items-center gap-3">
-              {post.author?.avatar ? (
+              {authorAvatar ? (
                 <img
-                  src={post.author.avatar}
-                  alt={post.author.fullName}
-                  className="w-10 h-10 rounded-full object-cover"
+                  src={authorAvatar}
+                  alt={authorName}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-blue-100"
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                  {getInitials(post.author?.username || post.author?.fullName)}
+                  {getInitials(authorName)}
                 </div>
               )}
               <div>
                 <p className="font-medium text-slate-800">
-                  {post.author?.fullName || post.author?.username || "Anonymous"}
+                  {authorName}
                 </p>
-                <p className="text-sm text-slate-500 flex items-center gap-1">
-                  <Calendar size={14} />
+                {authorBio && (
+                  <p className="text-xs text-slate-500 line-clamp-1">{authorBio}</p>
+                )}
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <Calendar size={12} />
                   {formatDate(post.createdAt)}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4 ml-auto">
-              {/* Like Button */}
               <button
                 onClick={handleLike}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
-                  liked 
-                    ? "bg-red-50 text-red-600" 
-                    : "bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600"
-                }`}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-500 transition-all duration-300"
               >
-                <Heart className={`w-5 h-5 ${liked ? "fill-red-600" : ""}`} />
+                <Heart 
+                  className={`w-5 h-5 transition-all duration-300 ${
+                    liked ? "fill-red-500 text-red-500" : "fill-none text-slate-400"
+                  }`} 
+                />
                 <span className="font-semibold">{likeCount}</span>
               </button>
               
@@ -328,7 +417,6 @@ const handleDeleteComment = async (commentId) => {
               Comments ({comments.length})
             </h3>
 
-            {/* Comment Form */}
             <form onSubmit={handleComment} className="mb-8">
               <div className="flex gap-3">
                 <input
@@ -355,54 +443,58 @@ const handleDeleteComment = async (commentId) => {
               )}
             </form>
 
-            {/* Comments List */}
             <div className="space-y-4">
               {comments.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">No comments yet. Be the first!</p>
               ) : (
-                comments.map((comment) => (
-                  <div key={comment._id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-                    <div className="flex items-start gap-3">
-                      {comment.user?.avatar ? (
-                        <img
-                          src={comment.user.avatar}
-                          alt={comment.user.fullName}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                          {getInitials(comment.user?.username || comment.user?.fullName)}
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-slate-800">
-                              {comment.user?.fullName || comment.user?.username || "Anonymous"}
-                            </p>
-                            <span className="text-xs text-slate-400">
-                              {formatDate(comment.createdAt)}
-                            </span>
+                comments.map((comment) => {
+                  const commentAuthor = getCommentAuthorName(comment);
+                  const commentAvatar = getCommentAuthorAvatar(comment);
+                  
+                  return (
+                    <div key={comment._id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                      <div className="flex items-start gap-3">
+                        {commentAvatar ? (
+                          <img
+                            src={commentAvatar}
+                            alt={commentAuthor}
+                            className="w-8 h-8 rounded-full object-cover border border-blue-100"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                            {getInitials(commentAuthor)}
                           </div>
-                          {(user?._id === comment.user?._id || user?._id === post.author?._id) && (
-                            <button
-                              onClick={() => handleDeleteComment(comment._id)}
-                              disabled={deletingComment === comment._id}
-                              className="text-slate-400 hover:text-red-600 transition disabled:opacity-50"
-                            >
-                              {deletingComment === comment._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-slate-800">
+                                {commentAuthor}
+                              </p>
+                              <span className="text-xs text-slate-400">
+                                {formatDate(comment.createdAt)}
+                              </span>
+                            </div>
+                            {(user?._id === comment.user?._id || user?._id === post.author?._id) && (
+                              <button
+                                onClick={() => handleDeleteComment(comment._id)}
+                                disabled={deletingComment === comment._id}
+                                className="text-slate-400 hover:text-red-600 transition disabled:opacity-50"
+                              >
+                                {deletingComment === comment._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-slate-600 mt-1">{comment.text}</p>
                         </div>
-                        <p className="text-slate-600 mt-1">{comment.text}</p>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

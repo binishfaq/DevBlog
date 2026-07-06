@@ -15,6 +15,16 @@ const BlogFilters = ({
   showFilters,
   setShowFilters,
 }) => {
+  const getCategoryName = (cat) => {
+    if (typeof cat === 'string') return cat;
+    if (cat && typeof cat === 'object') return cat.name || cat._id || '';
+    return '';
+  };
+
+  const validCategories = categories
+    .map(getCategoryName)
+    .filter(name => name && name.trim() !== '');
+
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-4 md:p-6 mb-8">
       <div className="flex flex-col md:flex-row gap-4">
@@ -68,7 +78,7 @@ const BlogFilters = ({
         >
           All
         </button>
-        {categories.map((category) => (
+        {validCategories.map((category) => (
           <button
             key={category}
             onClick={() => handleCategoryChange(category)}
@@ -109,5 +119,4 @@ const BlogFilters = ({
   );
 };
 
-// ✅ This is the line that was likely missing
 export default BlogFilters;

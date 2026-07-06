@@ -5,6 +5,7 @@ import {
   ArrowLeft, Edit3, BookOpen, X, Loader2
 } from "lucide-react";
 import Container from "../components/layout/Container";
+import { getMyPosts } from "../services/post.service";
 import api from "../api/axios";
 
 const Profile = () => {
@@ -23,6 +24,7 @@ const Profile = () => {
     avatar: "",
   });
   const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchProfile();
@@ -31,14 +33,17 @@ const Profile = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
+      setError("");
+      
       const token = localStorage.getItem("token");
       if (!token) {
         navigate("/login");
         return;
       }
 
+      // ✅ Get user profile
       const userRes = await api.get("/auth/me");
-      const userData = userRes.data.user;
+      const userData = userRes.data;
       setUser(userData);
       setFormData({
         fullName: userData.fullName || "",
@@ -48,10 +53,17 @@ const Profile = () => {
         avatar: userData.avatar || "",
       });
 
-      const postsRes = await api.get("/posts/my-posts");
-      setPosts(postsRes.data.posts || []);
+      // ✅ Get user posts
+      try {
+        const postsData = await getMyPosts();
+        setPosts(postsData || []);
+      } catch (postError) {
+        console.error("Error fetching posts:", postError);
+        setPosts([]);
+      }
     } catch (error) {
       console.error("Error fetching profile:", error);
+      setError(error.response?.data?.message || "Failed to load profile");
       if (error.response?.status === 401) {
         navigate("/login");
       }
@@ -67,82 +79,90 @@ const Profile = () => {
     });
   };
 
- const handleAvatarUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  // Validate file type
-  if (!file.type.startsWith("image/")) {
-    alert("Please upload an image file");
-    return;
-  }
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file");
+      return;
+    }
 
-  // Validate file size (max 2MB)
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Image size should be less than 2MB");
-    return;
-  }
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size should be less than 2MB");
+      return;
+    }
 
-  try {
-    setUploading(true);
-    
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64String = reader.result; // This is the full data URL
-        
-        const response = await api.post("/auth/upload-avatar", { 
-          avatar: base64String 
-        });
-        
-        const avatarUrl = response.data.avatar;
-        setUser({ ...user, avatar: avatarUrl });
-        setFormData({ ...formData, avatar: avatarUrl });
-        
-        // Update localStorage
-        const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-        localStorage.setItem("user", JSON.stringify({
-          ...storedUser,
-          avatar: avatarUrl
-        }));
+    try {
+      setUploading(true);
+      setError("");
+      
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const base64String = reader.result;
+          
+          // ✅ Update avatar using the update endpoint
+          const response = await api.put("/auth/update", { 
+            avatar: base64String 
+          });
+          
+          const updatedUser = response.data;
+          setUser(updatedUser);
+          setFormData({ ...formData, avatar: updatedUser.avatar });
+          
+          // Update localStorage
+          const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          localStorage.setItem("user", JSON.stringify({
+            ...storedUser,
+            avatar: updatedUser.avatar
+          }));
 
-        alert("Avatar updated successfully!");
-      } catch (error) {
-        console.error("Error uploading avatar:", error);
-        alert(error.response?.data?.message || "Failed to upload avatar");
-      } finally {
-        setUploading(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+          alert("Avatar updated successfully!");
+        } catch (error) {
+          console.error("Error uploading avatar:", error);
+          setError(error.response?.data?.message || "Failed to upload avatar");
+        } finally {
+          setUploading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
         }
-      }
-    };
-    reader.readAsDataURL(file);
-  } catch (error) {
-    console.error("Error reading file:", error);
-    alert("Failed to read image file");
-    setUploading(false);
-  }
-};
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error reading file:", error);
+      setError("Failed to read image file");
+      setUploading(false);
+    }
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
       setUpdating(true);
+      setError("");
+      
       const response = await api.put("/auth/update", formData);
-      setUser(response.data.user);
+      const updatedUser = response.data;
+      
+      setUser(updatedUser);
       setEditing(false);
       
+      // Update localStorage
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
       localStorage.setItem("user", JSON.stringify({
         ...storedUser,
-        ...response.data.user
+        ...updatedUser
       }));
       
       alert("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert(error.response?.data?.message || "Failed to update profile.");
+      setError(error.response?.data?.message || "Failed to update profile");
     } finally {
       setUpdating(false);
     }
@@ -150,11 +170,30 @@ const Profile = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "N/A";
+    }
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.charAt(0).toUpperCase();
+  };
+
+  const getLikesCount = (post) => {
+    if (Array.isArray(post.likes)) return post.likes.length;
+    return post.likes || 0;
+  };
+
+  const getCommentsCount = (post) => {
+    if (Array.isArray(post.comments)) return post.comments.length;
+    return post.comments || 0;
   };
 
   if (loading) {
@@ -168,6 +207,8 @@ const Profile = () => {
     );
   }
 
+  const publishedPosts = posts.filter(p => p.status === "published" || p.status === "Published");
+
   return (
     <div className="min-h-screen bg-slate-50 py-8">
       <Container>
@@ -180,6 +221,19 @@ const Profile = () => {
             <ArrowLeft size={16} />
             Back to Dashboard
           </Link>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl">
+              {error}
+              <button 
+                onClick={() => setError("")}
+                className="ml-4 text-red-400 hover:text-red-600"
+              >
+                <X className="w-4 h-4 inline" />
+              </button>
+            </div>
+          )}
 
           {/* Profile Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -196,9 +250,7 @@ const Profile = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      user?.fullName?.charAt(0)?.toUpperCase() || 
-                      user?.username?.charAt(0)?.toUpperCase() || 
-                      "U"
+                      getInitials(user?.fullName || user?.username)
                     )}
                   </div>
                   
@@ -274,7 +326,7 @@ const Profile = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-800">
-                    {posts.reduce((acc, p) => acc + (p.likes || 0), 0)}
+                    {posts.reduce((acc, p) => acc + getLikesCount(p), 0)}
                   </p>
                   <p className="text-xs text-slate-500">Likes</p>
                 </div>
@@ -286,7 +338,7 @@ const Profile = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-800">
-                    {posts.filter(p => p.status === "published").length}
+                    {publishedPosts.length}
                   </p>
                   <p className="text-xs text-slate-500">Published</p>
                 </div>
@@ -375,10 +427,10 @@ const Profile = () => {
           <div className="mt-8">
             <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-blue-600" />
-              My Posts ({posts.filter(p => p.status === "published").length})
+              My Posts ({publishedPosts.length})
             </h2>
 
-            {posts.filter(p => p.status === "published").length === 0 ? (
+            {publishedPosts.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-12 text-center">
                 <p className="text-slate-500">No published posts yet.</p>
                 <Link
@@ -390,7 +442,7 @@ const Profile = () => {
               </div>
             ) : (
               <div className="grid gap-3">
-                {posts.filter(p => p.status === "published").map((post) => (
+                {publishedPosts.map((post) => (
                   <div
                     key={post._id}
                     className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md transition"
@@ -403,10 +455,10 @@ const Profile = () => {
                           </Link>
                         </h3>
                         <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-                          <span className="text-xs">{post.category}</span>
+                          <span className="text-xs">{post.category || "General"}</span>
                           <span className="flex items-center gap-1">
                             <Heart className="w-4 h-4 text-red-400" />
-                            {post.likes || 0}
+                            {getLikesCount(post)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Eye className="w-4 h-4 text-blue-400" />

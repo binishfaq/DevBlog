@@ -3,9 +3,9 @@ import { Sparkles, TrendingUp } from "lucide-react";
 import Container from "../components/layout/Container";
 import BlogFilters from "../components/blog/BlogFilters";
 import BlogGrid from "../components/blog/BlogGrid";
-import BlogSkeleton from "../components/blog/BogSkeleton";
+import BlogSkeleton from "../components/blog/BlogSkeleton";
 import BlogPagination from "../components/blog/BlogPagination";
-import api from "../api/axios";
+import { getPosts, getCategories } from "../services/post.service";
 
 const Blogs = () => {
   const [blogs, setBlogs] = useState([]);
@@ -28,33 +28,51 @@ const Blogs = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await api.get("/posts/categories/all");
-      setCategories(response.data.categories || []);
+      const data = await getCategories();
+      setCategories(data || []);
     } catch (error) {
-      console.error("Error fetching categories:", error);
     }
   };
 
   const fetchBlogs = async () => {
     setLoading(true);
     try {
-      const params = {
-        page: currentPage,
-        limit: postsPerPage,
-        sort: sortBy,
-      };
+    
+      const allPosts = await getPosts();
 
+      let filteredPosts = allPosts;
       if (selectedCategory !== "all") {
-        params.category = selectedCategory;
+        filteredPosts = filteredPosts.filter(
+          post => post.category === selectedCategory
+        );
       }
-
       if (searchTerm) {
-        params.search = searchTerm;
+        const term = searchTerm.toLowerCase();
+        filteredPosts = filteredPosts.filter(
+          post => 
+            post.title?.toLowerCase().includes(term) ||
+            post.content?.toLowerCase().includes(term) ||
+            post.category?.toLowerCase().includes(term)
+        );
       }
-
-      const response = await api.get("/posts", { params });
       
-      const postsWithAuthors = (response.data.posts || []).map(post => ({
+      if (sortBy === "latest") {
+        filteredPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } else if (sortBy === "oldest") {
+        filteredPosts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      } else if (sortBy === "popular") {
+        filteredPosts.sort((a, b) => (b.views || 0) - (a.views || 0));
+      } else if (sortBy === "trending") {
+        filteredPosts.sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
+      }
+ 
+      const startIndex = (currentPage - 1) * postsPerPage;
+      const endIndex = startIndex + postsPerPage;
+      const paginatedPosts = filteredPosts.slice(startIndex, endIndex);
+ 
+      const total = Math.ceil(filteredPosts.length / postsPerPage);
+      
+      const formattedPosts = paginatedPosts.map(post => ({
         ...post,
         author: {
           ...post.author,
@@ -64,10 +82,11 @@ const Blogs = () => {
         }
       }));
       
-      setBlogs(postsWithAuthors);
-      setTotalPages(response.data.totalPages || 1);
+      
+      setBlogs(formattedPosts);
+      setTotalPages(total || 1);
     } catch (error) {
-      console.error("Error fetching blogs:", error);
+      setBlogs([]);
     } finally {
       setLoading(false);
     }
@@ -93,6 +112,15 @@ const Blogs = () => {
     setSortBy("latest");
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        fetchBlogs();
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 py-12">
@@ -149,11 +177,13 @@ const Blogs = () => {
         )}
 
         {/* Pagination */}
-        <BlogPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          setCurrentPage={setCurrentPage}
-        />
+        {!loading && blogs.length > 0 && (
+          <BlogPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
       </Container>
     </section>
   );

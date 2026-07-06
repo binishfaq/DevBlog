@@ -4,18 +4,27 @@ import { Calendar, Clock, Heart, Eye, MessageCircle, ArrowRight, User, Mail, Awa
 const BlogCard = ({ blog }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "N/A";
+    }
   };
 
   const getReadTime = (content) => {
     if (!content) return "1 min read";
-    const wordCount = content.replace(/<[^>]*>/g, "").split(/\s+/).length || 0;
-    const minutes = Math.ceil(wordCount / 200);
-    return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    try {
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      const wordCount = text ? text.split(/\s+/).length : 0;
+      const minutes = Math.ceil(wordCount / 200);
+      return minutes < 1 ? "1 min read" : `${minutes} min read`;
+    } catch (error) {
+      return "1 min read";
+    }
   };
 
   const getInitials = (name) => {
@@ -34,10 +43,82 @@ const BlogCard = ({ blog }) => {
       Database: "bg-red-100 text-red-700",
       "UI/UX": "bg-pink-100 text-pink-700",
       Career: "bg-orange-100 text-orange-700",
+      Technology: "bg-teal-100 text-teal-700",
+      General: "bg-gray-100 text-gray-700",
       Other: "bg-gray-100 text-gray-700",
     };
     return colors[category] || "bg-gray-100 text-gray-700";
   };
+
+  // ✅ Get the image URL (fallback to placeholder)
+  const getImageUrl = () => {
+    return blog.image || blog.featuredImage || null;
+  };
+
+  // ✅ Get author name - checks multiple possible locations
+  const getAuthorName = () => {
+    // Check createdBy (populated from backend)
+    if (blog.createdBy && typeof blog.createdBy === 'object') {
+      if (blog.createdBy.fullName) return blog.createdBy.fullName;
+      if (blog.createdBy.username) return blog.createdBy.username;
+    }
+    
+    // Check author object
+    if (blog.author && typeof blog.author === 'object') {
+      if (blog.author.fullName) return blog.author.fullName;
+      if (blog.author.username) return blog.author.username;
+      if (blog.author.name) return blog.author.name;
+    }
+    
+    // Check if author is a string
+    if (typeof blog.author === 'string') return blog.author;
+    
+    return "User"; // Fallback
+  };
+
+  // ✅ Get author avatar
+  const getAuthorAvatar = () => {
+    if (blog.createdBy && typeof blog.createdBy === 'object') {
+      return blog.createdBy.avatar || null;
+    }
+    if (blog.author && typeof blog.author === 'object') {
+      return blog.author.avatar || null;
+    }
+    return null;
+  };
+
+  // ✅ Get author bio
+  const getAuthorBio = () => {
+    if (blog.createdBy && typeof blog.createdBy === 'object') {
+      return blog.createdBy.bio || null;
+    }
+    if (blog.author && typeof blog.author === 'object') {
+      return blog.author.bio || null;
+    }
+    return null;
+  };
+
+  // ✅ Get likes count (handles both array and number)
+  const getLikesCount = () => {
+    if (Array.isArray(blog.likes)) return blog.likes.length;
+    return blog.likes || 0;
+  };
+
+  // ✅ Get comments count
+  const getCommentsCount = () => {
+    if (Array.isArray(blog.comments)) return blog.comments.length;
+    return blog.comments || 0;
+  };
+
+  // ✅ Get category
+  const getCategory = () => {
+    return blog.category || "General";
+  };
+
+  const authorName = getAuthorName();
+  const authorAvatar = getAuthorAvatar();
+  const authorBio = getAuthorBio();
+  const imageUrl = getImageUrl();
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-slate-100/50 transition-all duration-300 hover:-translate-y-1">
@@ -47,15 +128,18 @@ const BlogCard = ({ blog }) => {
         <div className="flex items-start gap-3">
           {/* Author Avatar */}
           <div className="flex-shrink-0">
-            {blog.author?.avatar ? (
+            {authorAvatar ? (
               <img
-                src={blog.author.avatar}
-                alt={blog.author.fullName}
+                src={authorAvatar}
+                alt={authorName}
                 className="w-12 h-12 rounded-full object-cover border-2 border-blue-100 shadow-sm"
+                onError={(e) => {
+                  e.target.src = "";
+                }}
               />
             ) : (
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold shadow-sm">
-                {getInitials(blog.author?.fullName || blog.author?.username)}
+                {getInitials(authorName)}
               </div>
             )}
           </div>
@@ -63,16 +147,14 @@ const BlogCard = ({ blog }) => {
           {/* Author Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-1.5">
-              {/* Full Name */}
               <span className="text-sm font-semibold text-slate-800 truncate">
-                {blog.author?.fullName || blog.author?.username || "Anonymous"}
+                {authorName}
               </span>
             </div>
             
-            {/* Bio */}
-            {blog.author?.bio && (
+            {authorBio && (
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                {blog.author.bio}
+                {authorBio}
               </p>
             )}
           </div>
@@ -80,17 +162,20 @@ const BlogCard = ({ blog }) => {
       </div>
 
       {/* ===== FEATURED IMAGE ===== */}
-      {blog.featuredImage && (
-        <div className="relative h-52 overflow-hidden">
+      {imageUrl && (
+        <div className="relative h-52 overflow-hidden bg-slate-100">
           <img
-            src={blog.featuredImage}
-            alt={blog.title}
+            src={imageUrl}
+            alt={blog.title || "Blog post"}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            onError={(e) => {
+              e.target.src = "https://via.placeholder.com/800x400?text=No+Image";
+            }}
           />
           <div className="absolute top-4 left-4">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(blog.category)}`}>
-              {blog.category}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(getCategory())}`}>
+              {getCategory()}
             </span>
           </div>
           <div className="absolute bottom-4 left-4 flex items-center gap-2">
@@ -102,7 +187,7 @@ const BlogCard = ({ blog }) => {
           <div className="absolute bottom-4 right-4 flex items-center gap-2">
             <span className="flex items-center gap-1 text-xs text-white/90 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full">
               <Heart className="w-3 h-3 text-red-400" />
-              {blog.likes || 0}
+              {getLikesCount()}
             </span>
             <span className="flex items-center gap-1 text-xs text-white/90 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full">
               <Eye className="w-3 h-3 text-blue-400" />
@@ -114,30 +199,30 @@ const BlogCard = ({ blog }) => {
 
       {/* ===== CONTENT ===== */}
       <div className="p-5">
-        {!blog.featuredImage && (
-          <span className={`inline-block mb-3 px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(blog.category)}`}>
-            {blog.category}
+        {!imageUrl && (
+          <span className={`inline-block mb-3 px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(getCategory())}`}>
+            {getCategory()}
           </span>
         )}
 
         <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
           <Link to={`/blogs/${blog.slug || blog._id}`}>
-            {blog.title}
+            {blog.title || "Untitled"}
           </Link>
         </h3>
 
         <p className="mt-2 text-slate-600 text-sm line-clamp-2">
-          {blog.content?.replace(/<[^>]*>/g, "").substring(0, 150)}...
+          {blog.content?.replace(/<[^>]*>/g, "").substring(0, 150) || "No content available"}...
         </p>
 
         {/* ===== FOOTER ===== */}
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm text-slate-400">
             <span className="flex items-center gap-1">
-              <Heart className="w-4 h-4 text-red-400" /> {blog.likes || 0}
+              <Heart className="w-4 h-4 text-red-400" /> {getLikesCount()}
             </span>
             <span className="flex items-center gap-1">
-              <MessageCircle className="w-4 h-4 text-blue-400" /> {blog.comments?.length || 0}
+              <MessageCircle className="w-4 h-4 text-blue-400" /> {getCommentsCount()}
             </span>
           </div>
           <Link

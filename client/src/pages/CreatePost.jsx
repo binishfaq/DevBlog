@@ -19,79 +19,70 @@ const CreatePost = () => {
   const [imagePreview, setImagePreview] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSaveDraft = async () => {
-  try {
-    setIsSaving(true);
+    if (!title.trim() || !content.trim()) {
+      setError("Please add a title and content before saving.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
 
-    const post = {
-      title,
-      content,
-      category,
-      tags,
-      featuredImage: "",
-      status: "draft",
-    };
+    try {
+      setIsSaving(true);
+      setError("");
 
-    console.log(post);
-console.log("Size:", JSON.stringify(post).length);
-    
+      const postData = {
+        title: title.trim(),
+        content: content.trim(),
+        category: category || "General",
+        tags: tags.join(', '),
+        image: imagePreview || "",
+        status: "draft",
+        author: "Test User"
+      };
 
-    const res = await createPost(post);
-
-    alert("Draft Saved!");
-
-    navigate("/dashboard");
-
-  } catch (error) {
-    console.error(error);
-
-    alert(
-      error.response?.data?.message ||
-      "Failed to save draft"
-    );
-
-  } finally {
-    setIsSaving(false);
-  }
-};
+      const response = await createPost(postData);
+  
+      navigate("/dashboard");
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to save draft. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handlePublish = async () => {
-  if (!title.trim() || !content.trim()) {
-    alert("Please add a title and content before publishing.");
-    return;
-  }
+    if (!title.trim() || !content.trim()) {
+      setError("Please add a title and content before publishing.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
 
-  try {
-    setIsPublishing(true);
+    try {
+      setIsPublishing(true);
+      setError("");
 
-    const post = {
-      title,
-      content,
-      category,
-      tags,
-      featuredImage: imagePreview,
-      status: "published",
-    };
+      const postData = {
+        title: title.trim(),
+        content: content.trim(),
+        category: category || "General",
+        tags: tags.join(', '),
+        image: imagePreview || "https://via.placeholder.com/800x400",
+        status: "published",
+        author: "Test User"
+      };
 
-    const res = await createPost(post);
 
-    alert(res.message);
-
-    navigate("/dashboard/posts");
-
-  } catch (error) {
-    console.error(error);
-
-    alert(
-      error.response?.data?.message ||
-      "Failed to publish post"
-    );
-
-  } finally {
-    setIsPublishing(false);
-  }
-};
+      const response = await createPost(postData);
+      navigate("/dashboard/posts");
+    } catch (error) {
+      console.error("❌ Error publishing post:", error);
+      setError(error.response?.data?.message || "Failed to publish post. Please try again.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -120,6 +111,18 @@ console.log("Size:", JSON.stringify(post).length);
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
+  const getWordCount = () => {
+    if (!content) return 0;
+    // Strip HTML tags and count words
+    const text = content.replace(/<[^>]*>/g, "").trim();
+    return text ? text.split(/\s+/).length : 0;
+  };
+
+  const getCharacterCount = () => {
+    if (!content) return 0;
+    return content.replace(/<[^>]*>/g, "").length;
+  };
+
   return (
     <div className="flex bg-gray-50 min-h-screen">
       <Sidebar />
@@ -141,6 +144,13 @@ console.log("Size:", JSON.stringify(post).length);
               onPublish={handlePublish}
             />
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl">
+              {error}
+            </div>
+          )}
 
           {/* Main Editor Area */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -186,12 +196,24 @@ console.log("Size:", JSON.stringify(post).length);
                   <div className="flex justify-between">
                     <span className="text-gray-500">Words</span>
                     <span className="text-gray-700 font-medium">
-                      {content?.replace(/<[^>]*>/g, "").length || 0}
+                      {getWordCount()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Characters</span>
+                    <span className="text-gray-700 font-medium">
+                      {getCharacterCount()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Status</span>
                     <span className="text-yellow-600 font-medium">Draft</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Tags</span>
+                    <span className="text-gray-700 font-medium">
+                      {tags.length > 0 ? tags.join(", ") : "None"}
+                    </span>
                   </div>
                 </div>
               </div>

@@ -1,10 +1,12 @@
-import { Search } from "lucide-react";
+import { Search} from "lucide-react";
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+ 
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -28,9 +30,6 @@ const Navbar = () => {
           className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition text-sm"
         />
       </form>
-
-      {/* Empty right side - clean */}
-      <div className="w-16"></div>
     </header>
   );
 };
