@@ -124,8 +124,8 @@ npm install
 Create a `.env` file in the `server` folder:
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/devblog
-JWT_SECRET=your_jwt_secret_key
+MONGODB_URI=mongodb://********************
+JWT_SECRET=*****************************
 CLIENT_URL=http://localhost:5173
 ```
 
